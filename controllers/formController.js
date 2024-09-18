@@ -14,18 +14,26 @@ exports.submitForm = async (req, res) => {
     const { formName, pages } = req.body;
     const files = req.files;
     const userId = req.userId;  // Assuming this comes from auth middleware
+    
+    // Parsing the pages data
+    const pagesData = typeof pages === 'string' ? JSON.parse(pages) : pages;
+    
     // Validation for required fields
-    if (!formName || !pages || !Array.isArray(JSON.parse(pages))) {
+    if (!formName || !pagesData || !Array.isArray(pagesData)) {
       return res.status(400).json({ error: 'Invalid form data' });
     }
 
     const fileData = {};
 
-    // Check and process signature
+    // Process signature
     if (req.body.signature) {
       const base64Data = req.body.signature.split(',')[1];
-      const buffer = Buffer.from(base64Data, 'base64');
+      if (!base64Data) {
+        return res.status(400).json({ error: 'Invalid signature format' });
+      }
       
+      const buffer = Buffer.from(base64Data, 'base64');
+
       // Upload signature to S3
       const uploadParams = {
         Bucket: process.env.S3_BUCKET_NAME,
@@ -43,7 +51,7 @@ exports.submitForm = async (req, res) => {
       };
     }
 
-    // Process uploaded files using multer
+    // Process uploaded files
     if (files && files.length > 0) {
       for (const file of files) {
         const uploadParams = {
@@ -51,7 +59,6 @@ exports.submitForm = async (req, res) => {
           Key: `uploads/${Date.now()}_${file.originalname}`,
           Body: file.buffer,
           ContentType: file.mimetype,
-          
         };
 
         const uploadResult = await s3.upload(uploadParams).promise();
@@ -68,7 +75,7 @@ exports.submitForm = async (req, res) => {
     const newForm = new Form({
       formName,
       userId,  // Associate form with the current user
-      pages: JSON.parse(pages),
+      pages: pagesData,  // Already parsed pages data
       files: fileData,
     });
 
