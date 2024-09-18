@@ -21,7 +21,7 @@ exports.register = async (req, res) => {
     await newUser.save();
 
     // Generate JWT token
-    const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET_KEY, { expiresIn: '1h' });
+    const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET_KEY, { expiresIn: '3h' });
 
     // Send success response with token
     res.status(201).json({ message: 'User registered successfully', token });
@@ -49,7 +49,7 @@ exports.login = async (req, res) => {
     }
 
     // Generate JWT token, including the user's pro status
-    const token = jwt.sign({ userId: user._id, isPro: user.isPro }, process.env.JWT_SECRET_KEY, { expiresIn: '1h' });
+    const token = jwt.sign({ userId: user._id, isPro: user.isPro }, process.env.JWT_SECRET_KEY, { expiresIn: '3h' });
 
     res.status(200).json({ message: 'Login successful', token });
   } catch (error) {
