@@ -12,79 +12,29 @@ const upload = multer({ storage: storage });
 exports.submitForm = async (req, res) => {
   try {
     const { formName, pages } = req.body;
-    const files = req.files;
-    const userId = req.userId;  // Assuming this comes from auth middleware
-    
-    // Parsing the pages data
-    const pagesData = typeof pages === 'string' ? JSON.parse(pages) : pages;
-    
-    // Validation for required fields
-    if (!formName || !pagesData || !Array.isArray(pagesData)) {
+    const userId = req.userId;
+
+    if (!formName || !Array.isArray(pages)) {
       return res.status(400).json({ error: 'Invalid form data' });
     }
 
-    const fileData = {};
-
-    // Process signature
-    if (req.body.signature) {
-      const base64Data = req.body.signature.split(',')[1];
-      if (!base64Data) {
-        return res.status(400).json({ error: 'Invalid signature format' });
-      }
-      
-      const buffer = Buffer.from(base64Data, 'base64');
-
-      // Upload signature to S3
-      const uploadParams = {
-        Bucket: process.env.S3_BUCKET_NAME,
-        Key: `signatures/${Date.now()}_signature.png`,
-        Body: buffer,
-        ContentType: 'image/png',
-      };
-
-      const uploadResult = await s3.upload(uploadParams).promise();
-
-      fileData['signature'] = {
-        url: uploadResult.Location,
-        key: uploadResult.Key,
-        mimetype: 'image/png',
-      };
-    }
-
-    // Process uploaded files
-    if (files && files.length > 0) {
-      for (const file of files) {
-        const uploadParams = {
-          Bucket: process.env.S3_BUCKET_NAME,
-          Key: `uploads/${Date.now()}_${file.originalname}`,
-          Body: file.buffer,
-          ContentType: file.mimetype,
-        };
-
-        const uploadResult = await s3.upload(uploadParams).promise();
-
-        fileData[file.fieldname] = {
-          url: uploadResult.Location,
-          key: uploadResult.Key,
-          mimetype: file.mimetype,
-        };
-      }
-    }
-
-    // Create new form using MongoDB's _id
     const newForm = new Form({
       formName,
-      userId,  // Associate form with the current user
-      pages: pagesData,  // Already parsed pages data
-      files: fileData,
+      userId,
+      pages: pages.map(page => ({
+        pageId: page.pageId,
+        pageName: page.pageName,
+        fields: page.fields,
+        componentsMetaData: page.componentsMetaData
+      }))
     });
 
     const savedForm = await newForm.save();
 
     res.status(201).json({ message: 'Form submitted successfully', formId: savedForm._id });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Error submitting form:', error);
+    res.status(500).json({ error: 'Server error', details: error.message });
   }
 };
 
@@ -144,15 +94,16 @@ exports.getFile = (req, res) => {
   }
 };
 
-// Updated editForm to handle file updates in S3
+// Updated editForm to handle form updates and file uploads
 exports.editForm = async (req, res) => {
   try {
     const { id } = req.params;
     const { formName, pages } = req.body;
+    const userId = req.userId;  // Extract userId from the authenticated request
     const files = req.files; // Contains the newly uploaded files
 
-    // Find the form by ID
-    let form = await Form.findById(id);
+    // Find the form by ID and userId
+    let form = await Form.findOne({ _id: id});
 
     if (!form) {
       return res.status(404).json({ error: 'Form not found' });
@@ -165,46 +116,42 @@ exports.editForm = async (req, res) => {
 
     // Update pages if provided
     if (pages) {
-      try {
-        form.pages = JSON.parse(pages); // Ensure pages is valid JSON
-      } catch (error) {
-        return res.status(400).json({ error: 'Invalid JSON format for pages' });
-      }
+      form.pages = pages;  // Assuming pages is already in the correct format
     }
 
     // Process newly uploaded files (using multer)
-    if (files && files.length > 0) {
-      if (!form.files) {
-        form.files = new Map(); // Initialize the files Map if it doesn't exist
-      }
+    // if (files && files.length > 0) {
+    //   if (!form.files) {
+    //     form.files = new Map(); // Initialize the files Map if it doesn't exist
+    //   }
 
-      // Use a `for...of` loop to properly handle async uploads
-      for (const file of files) {
-        const sanitizedFileName = file.originalname.replace(/\./g, '_'); // Replace dots with underscores
+    //   // Use a `for...of` loop to properly handle async uploads
+    //   for (const file of files) {
+    //     const sanitizedFileName = file.originalname.replace(/\./g, '_'); // Replace dots with underscores
 
-        const uploadParams = {
-          Bucket: process.env.S3_BUCKET_NAME,
-          Key: `uploads/${Date.now()}_${file.originalname}`,
-          Body: file.buffer,
-          ContentType: file.mimetype,
-        };
+    //     const uploadParams = {
+    //       Bucket: process.env.S3_BUCKET_NAME,
+    //       Key: `uploads/${Date.now()}_${file.originalname}`,
+    //       Body: file.buffer,
+    //       ContentType: file.mimetype,
+    //     };
 
-        // Upload file to S3
-        const uploadResult = await s3.upload(uploadParams).promise();
+    //     // Upload file to S3
+    //     const uploadResult = await s3.upload(uploadParams).promise();
 
-        // Add or update the file entry in the Map
-        form.files.set(sanitizedFileName, {
-          url: uploadResult.Location,
-          key: uploadResult.Key,
-          mimetype: file.mimetype,
-        });
-      }
-    }
+    //     // Add or update the file entry in the Map
+    //     form.files.set(sanitizedFileName, {
+    //       url: uploadResult.Location,
+    //       key: uploadResult.Key,
+    //       mimetype: file.mimetype,
+    //     });
+    //   }
+    // }
 
     // Save the updated form
     const updatedForm = await form.save();
 
-    return res.status(200).json({ message: 'Form updated successfully', form: updatedForm });
+    return res.status(200).json(updatedForm);
   } catch (error) {
     console.error("Error in updating form:", error);
     res.status(500).json({ error: 'Server error' });
@@ -212,43 +159,46 @@ exports.editForm = async (req, res) => {
 };
 
 
-
-// Delete a form and its associated files
 exports.deleteForm = async (req, res) => {
   try {
-    const { id } = req.params; // Use MongoDB's _id for querying
+    const { id } = req.params;
+    const userId = req.userId;
 
-    const form = await Form.findById(id); // Find the form by MongoDB's _id
+    const form = await Form.findOne({ _id: id });
     if (!form) {
-      return res.status(404).json({ error: 'Form not found' });
+      console.log(`Form not found. ID: ${id}, UserID: ${userId}`);
+      return res.status(404).json({ error: 'Form not found', details: 'The requested form does not exist or you do not have permission to delete it.' });
     }
 
-    // Delete associated files from S3
-    const deletePromises = [];
-    for (const [fieldName, file] of Object.entries(form.files)) {
-      if (!file.key) {
-        console.error(`File key is missing for field: ${fieldName}`, file);
-        continue; // Skip this file if the key is missing
-      }
+    // const deletePromises = [];
+    // if (form.files && form.files instanceof Map) {
+    //   for (const [fieldName, file] of form.files) {
+    //     if (!file.key) {
+    //       console.error(`File key is missing for field: ${fieldName}`, file);
+    //       continue;
+    //     }
+    //
+    //     const params = {
+    //       Bucket: process.env.S3_BUCKET_NAME,
+    //       Key: file.key,
+    //     };
+    //
+    //     deletePromises.push(s3.deleteObject(params).promise());
+    //   }
+    // }
+    //
+    // await Promise.all(deletePromises);
 
-      const params = {
-        Bucket: process.env.S3_BUCKET_NAME,
-        Key: file.key,
-      };
-
-      deletePromises.push(s3.deleteObject(params).promise());
+    const deletedForm = await Form.findOneAndDelete({ _id: id});
+    if (!deletedForm) {
+      console.log(`Form not found during deletion. ID: ${id}, UserID: ${userId}`);
+      return res.status(404).json({ error: 'Form not found', details: 'The form was not found during the deletion process.' });
     }
 
-    // Wait for all files to be deleted from S3
-    await Promise.all(deletePromises);
-
-    // Delete the form from MongoDB
-    await Form.findByIdAndDelete(id);
-
-    res.status(200).json({ message: 'Form deleted successfully' });
+    res.status(200).json({ message: 'Form deleted successfully', formId: id });
   } catch (error) {
     console.error('Error in deleteForm:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error', details: error.message });
   }
 };
 

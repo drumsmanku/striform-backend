@@ -279,7 +279,7 @@ router.get('/:id',authenticate, formController.getFormById);
  *                   type: string
  *                   example: "Server error"
  */
-router.put('/:id', upload.any(),editForm);
+router.put('/:id', editForm);
 
 /**
  * @swagger
