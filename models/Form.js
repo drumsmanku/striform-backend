@@ -20,6 +20,7 @@ const formSchema = new mongoose.Schema({
     required: true,
     default: () => new mongoose.Types.ObjectId().toString()
   },
+  design:{},
   formName: { type: String, required: true },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
