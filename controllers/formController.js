@@ -31,7 +31,7 @@ exports.submitForm = async (req, res) => {
 
     const savedForm = await newForm.save();
 
-    res.status(201).json({ message: 'Form submitted successfully', formId: savedForm._id });
+    res.status(201).json({ message: 'Form submitted successfully', formId: savedForm._id, savedForm: savedForm });
   } catch (error) {
     console.error('Error submitting form:', error);
     res.status(500).json({ error: 'Server error', details: error.message });
