@@ -13,9 +13,12 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 
 app.use(cors({
-  origin: '*', // Replace with your frontend URL
-  credentials: true, // If you're sending cookies or authentication headers
+  origin: 'https://striform.com', // Set your frontend URL here
+  credentials: true, // Enable credentials if needed
 }));
+
+// Handle Preflight requests
+app.options('*', cors());
 
 
 // Swagger route
