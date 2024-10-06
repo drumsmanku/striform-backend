@@ -12,10 +12,7 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 
-app.use(cors({
-  origin: 'https://striform.com', // Set your frontend URL here
-  credentials: true, // Enable credentials if needed
-}));
+app.use(cors());
 
 // Handle Preflight requests
 app.options('*', cors());
