@@ -12,10 +12,17 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 
-app.use(cors());
+app.use(cors({
+  origin: 'https://striform.com',  // Set your frontend URL here
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],  // Allowed methods
+  credentials: true, // If you're using cookies or sending auth tokens in headers
+  allowedHeaders: ['Content-Type', 'Authorization'],  // Allowed headers
+}));
 
-// Handle Preflight requests
-app.options('*', cors());
+// Handle Preflight (OPTIONS) requests
+app.options('*', cors({
+  origin: 'https://striform.com', // Ensure it's applied here too
+}));
 
 
 // Swagger route

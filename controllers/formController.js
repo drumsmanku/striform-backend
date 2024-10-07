@@ -42,6 +42,9 @@ exports.submitForm = async (req, res) => {
 // Updated getFormById to include file URLs
 exports.getFormById = async (req, res) => {
   try {
+    res.setHeader('Access-Control-Allow-Origin', 'https://striform.com');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     const { id } = req.params;
     const userId = req.userId;  // Get the userId from the authenticated request
 
