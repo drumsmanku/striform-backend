@@ -11,11 +11,20 @@ dotenv.config();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+app.use(cors({
+  origin: '*',  // Allow all origins (not recommended for production)
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true // Allow credentials if needed (cookies, authorization headers)
+}));
 
-app.use(cors());
+// Handle Preflight (OPTIONS) requests for all routes
+app.options('*', cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+}));
 
-// Handle Preflight requests
-// app.options('*', cors());
 
 
 // Swagger route
